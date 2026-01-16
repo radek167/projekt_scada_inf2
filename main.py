@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QLabel, QHBoxLayout, QSlider, QFrame
 from PyQt5.QtCore import QTimer, Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QColor, QPen, QPolygonF, QFont, QPainterPath
 
@@ -55,6 +55,9 @@ class ZbiornikWoda(Scada):
     def __init__(self, x, y, name):
         Scada.__init__(self, x, y, 90, 120, name)
         self.level = 80.0
+        self.flow_in = 0.0  # Otwarcie zaworu wlotowego
+        self.flow_out = 0.0  # Otwarcie zaworu wylotowego
+        self.ui_label_m3 = None  # Miejsce na etykietę licznika
 
     def draw_content(self, painter):
         painter.setPen(QPen(Qt.white, 2))
@@ -75,7 +78,7 @@ class ZbiornikWoda(Scada):
 class ZbiornikWegiel(Scada):
     def __init__(self, x, y, name):
         Scada.__init__(self, x, y, 100, 150, name)
-        self.amount = 100.0
+        self.amount = 0.0
 
     def update(self, dt):
 
@@ -112,7 +115,7 @@ class ZbiornikWegiel(Scada):
         if self.amount > 20:
             painter.setPen(Qt.green)
         else:
-            painter.setPen(Qt.red)  
+            painter.setPen(Qt.red)
 
         painter.setFont(QFont("Arial", 10, QFont.Bold))
         painter.drawText(35, 50, f"{int(self.amount)}%")
@@ -246,7 +249,6 @@ class SiecEnerg(Scada):
         bot_y = 150
         leg_y = 200
 
-
         rect_top = QRectF(cx - hw, top_y, box_w, mid_y - top_y)
         painter.drawRect(rect_top)
         painter.drawLine(int(cx - hw), int(top_y), int(cx + hw), int(mid_y))
@@ -257,10 +259,8 @@ class SiecEnerg(Scada):
         painter.drawLine(int(cx - hw), int(mid_y), int(cx + hw), int(bot_y))
         painter.drawLine(int(cx + hw), int(mid_y), int(cx - hw), int(bot_y))
 
-
         painter.drawLine(int(cx - hw), int(bot_y), int(cx - hw - 20), int(leg_y))
         painter.drawLine(int(cx + hw), int(bot_y), int(cx + hw + 20), int(leg_y))
-
 
         arm_len = 45
 
@@ -294,8 +294,6 @@ class SiecEnerg(Scada):
         path.cubicTo(pt_rd.x() + 30, pt_rd.y() + 20, self.width, pt_rd.y() - 10, self.width, pt_rd.y() - 20)
 
         painter.drawPath(path)
-
-
 
 class ScadaScene(QWidget):
     def __init__(self):
@@ -351,11 +349,218 @@ class ScadaScene(QWidget):
         for comp in self.Scadas:
             comp.draw(painter)
 
+class MiniPodglad(QWidget):
+    def __init__(self, obiekt_scada):
+        super().__init__()
+        self.obiekt = obiekt_scada
+        self.setFixedSize(int(self.obiekt.width), int(self.obiekt.height))
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update)
+        self.timer.start(50)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        self.obiekt.draw_content(painter)
+
+class MiniPodglad(QWidget):
+    def __init__(self, obiekt_scada):
+        super().__init__()
+        self.obiekt = obiekt_scada
+        self.setFixedSize(int(self.obiekt.width), int(self.obiekt.height))
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update)
+        self.timer.start(50)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        self.obiekt.draw_content(painter)
+
+class okno_materialy(QWidget):
+    def __init__(self, scene):
+        super().__init__()
+        self.scene = scene
+        self.setWindowTitle("Zarządzanie materiałami")
+        self.resize(1000, 550)
+        self.setStyleSheet("background-color: #222; color: white;")
+
+        main_layout = QVBoxLayout()
+
+        ramka_wegiel = QFrame()
+        ramka_wegiel.setStyleSheet("background-color: #2a2a2a; border-radius: 5px;")
+        layout_wegiel = QHBoxLayout(ramka_wegiel)
+
+        layout_wegiel.addWidget(MiniPodglad(self.scene.silo))
+
+        col_wegiel = QVBoxLayout()
+
+        lbl_tytul = QLabel("MAGAZYN WĘGLA")
+        lbl_tytul.setStyleSheet("font-weight: bold; color: orange; font-size: 14px;")
+        col_wegiel.addWidget(lbl_tytul)
+
+        self.lbl_wolne = QLabel("Wolne: ... %")
+        self.lbl_wolne.setStyleSheet("color: #aaa;")
+        col_wegiel.addWidget(self.lbl_wolne)
+
+        self.slider_wegiel = QSlider(Qt.Horizontal)
+        self.slider_wegiel.setMinimum(0)
+        self.slider_wegiel.setMaximum(0)
+        self.slider_wegiel.setStyleSheet("QSlider::handle:horizontal { background: orange; }")
+
+        self.slider_wegiel.valueChanged.connect(self.aktualizuj_etykiete_suwaka_wegla)
+        col_wegiel.addWidget(self.slider_wegiel)
+
+        self.lbl_wybrano = QLabel("Wybrano: 0 %")
+        self.lbl_wybrano.setStyleSheet("color: orange; font-weight: bold;")
+        col_wegiel.addWidget(self.lbl_wybrano)
+
+        self.btn_dostawa = QPushButton("ZATWIERDŹ DOSTAWĘ")
+        self.btn_dostawa.setFixedHeight(40)
+        self.btn_dostawa.setStyleSheet("background-color: #444; color: orange; border: 1px solid orange;")
+        self.btn_dostawa.clicked.connect(self.wykonaj_dostawe)
+        col_wegiel.addWidget(self.btn_dostawa)
+
+        self.lbl_tonaz = QLabel("Stan: 0 / 800 t")
+        col_wegiel.addWidget(self.lbl_tonaz)
+
+        layout_wegiel.addLayout(col_wegiel)
+        main_layout.addWidget(ramka_wegiel)
+
+        lbl_woda = QLabel("STEROWNIA HYDRAULICZNA (1000 m³)")
+        lbl_woda.setStyleSheet("font-weight: bold; color: cyan; font-size: 14px; margin-top: 10px;")
+        lbl_woda.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(lbl_woda)
+
+        woda_container = QHBoxLayout()
+
+        def stworz_panel_pionowy(zbiornik, nazwa):
+            frame = QFrame()
+            frame.setStyleSheet("background-color: #2a2a2a; border-radius: 5px;")
+
+            v_layout = QVBoxLayout(frame)
+
+            lbl_name = QLabel(nazwa)
+            lbl_name.setStyleSheet("font-weight: bold; font-size: 12px; color: cyan;")
+            lbl_name.setAlignment(Qt.AlignCenter)
+            v_layout.addWidget(lbl_name)
+
+            grafika = MiniPodglad(zbiornik)
+            h_center = QHBoxLayout()
+            h_center.addStretch()
+            h_center.addWidget(grafika)
+            h_center.addStretch()
+            v_layout.addLayout(h_center)
+
+            lbl_in = QLabel("Dopływ: 0%")
+            lbl_in.setStyleSheet("font-size: 10px; color: #aaa;")
+            v_layout.addWidget(lbl_in)
+
+            sl_in = QSlider(Qt.Horizontal)
+            sl_in.setRange(0, 100)
+            sl_in.setStyleSheet("QSlider::handle:horizontal { background: cyan; height: 10px; }")
+            v_layout.addWidget(sl_in)
+
+            lbl_out = QLabel("Odpływ: 0%")
+            lbl_out.setStyleSheet("font-size: 10px; color: #aaa;")
+            v_layout.addWidget(lbl_out)
+
+            sl_out = QSlider(Qt.Horizontal)
+            sl_out.setRange(0, 100)
+            sl_out.setStyleSheet("QSlider::handle:horizontal { background: #ff5555; height: 10px; }")
+            v_layout.addWidget(sl_out)
+
+            btn_set = QPushButton("USTAW")
+            btn_set.setStyleSheet("background-color: #004488; color: white; border: none; padding: 5px;")
+            v_layout.addWidget(btn_set)
+
+            lbl_info = QLabel("0 m³")
+            lbl_info.setAlignment(Qt.AlignCenter)
+            lbl_info.setStyleSheet("font-size: 10px; color: white;")
+            zbiornik.ui_label_m3 = lbl_info
+            v_layout.addWidget(lbl_info)
+
+            def on_in_change(val):
+                lbl_in.setText(f"Dopływ: {val}%")
+
+            def on_out_change(val):
+                lbl_out.setText(f"Odpływ: {val}%")
+
+            def on_click():
+                self.zatwierdz_przeplyw(zbiornik, sl_in, sl_out)
+
+            sl_in.valueChanged.connect(on_in_change)
+            sl_out.valueChanged.connect(on_out_change)
+            btn_set.clicked.connect(on_click)
+
+            return frame
+
+        woda_container.addWidget(stworz_panel_pionowy(self.scene.w1, "ZB. GŁÓWNY 1"))
+        woda_container.addWidget(stworz_panel_pionowy(self.scene.w2, "ZB. GŁÓWNY 2"))
+        woda_container.addWidget(stworz_panel_pionowy(self.scene.wr, "REZERWA"))
+
+        main_layout.addLayout(woda_container)
+
+        self.setLayout(main_layout)
+
+        self.timer_logic = QTimer(self)
+        self.timer_logic.timeout.connect(self.update_logic)
+        self.timer_logic.start(100)
+
+    def aktualizuj_etykiete_suwaka_wegla(self, val):
+        tony_wybrane = (val / 100.0) * 800.0
+        self.lbl_wybrano.setText(f"Wybrano: {val}% ({int(tony_wybrane)} t)")
+
+    def wykonaj_dostawe(self):
+        val = self.slider_wegiel.value()
+        if val > 0:
+            self.scene.silo.amount += val
+            self.slider_wegiel.setValue(0)
+            self.lbl_wybrano.setText("Wybrano: 0 %")
+
+    def zatwierdz_przeplyw(self, zbiornik, slider_in, slider_out):
+        zbiornik.flow_in = float(slider_in.value())
+        zbiornik.flow_out = float(slider_out.value())
+
+    def update_logic(self):
+        obecny_poziom_proc = self.scene.silo.amount
+        wolne_miejsce = 100.0 - obecny_poziom_proc
+        self.lbl_wolne.setText(f"Wolne: {int(wolne_miejsce)}%")
+
+        obecne_tony = (obecny_poziom_proc / 100.0) * 800.0
+        self.lbl_tonaz.setText(f"Stan: {int(obecne_tony)} / 800 t")
+
+        max_dostawa = int(wolne_miejsce)
+        self.slider_wegiel.setMaximum(max_dostawa)
+        if self.slider_wegiel.value() > max_dostawa:
+            self.slider_wegiel.setValue(max_dostawa)
+
+        POJEMNOSC_ZBIORNIKA_M3 = 1000.0
+        MAX_PRZEPUSTOWOSC_RURY = 5.0
+
+        for z in [self.scene.w1, self.scene.w2, self.scene.wr]:
+            if hasattr(z, 'flow_in'):
+                wplyw_m3 = (z.flow_in / 100.0) * MAX_PRZEPUSTOWOSC_RURY
+                wyplyw_m3 = (z.flow_out / 100.0) * MAX_PRZEPUSTOWOSC_RURY
+
+                bilans_m3 = wplyw_m3 - wyplyw_m3
+                delta_procent = (bilans_m3 / POJEMNOSC_ZBIORNIKA_M3) * 100.0
+
+                z.level = max(0.0, min(100.0, z.level + delta_procent))
+
+                if hasattr(z, 'ui_label_m3') and z.ui_label_m3:
+                    aktualne_m3 = (z.level / 100.0) * POJEMNOSC_ZBIORNIKA_M3
+                    znak = "+" if bilans_m3 >= 0 else ""
+                    str_bilans = f"{znak}{bilans_m3:.2f}"
+                    z.ui_label_m3.setText(
+                        f"{aktualne_m3:.1f} m³\n"
+                        f"Bilans: {str_bilans}"
+                    )
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SCADA - Wizualizacja Węgla (Bez symulacji)")
+        self.setWindowTitle("Elektrociepłownia")
         self.resize(1100, 750)
         self.setStyleSheet("background-color: black;")
 
@@ -366,6 +571,18 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.scene.update_simulation)
         self.timer.start(50)
 
+        self.okno_materialy = None
+
+        btn = QPushButton("Materiały", self)
+        btn.setGeometry(50,600,200,50)
+        btn.setStyleSheet("background-color: lightgray; color: black; border: 2px solid white;")
+        btn.clicked.connect(self.okno_materialy1)
+
+    def okno_materialy1(self):
+        if self.okno_materialy is None:
+            self.okno_materialy = okno_materialy(self.scene)
+
+        self.okno_materialy.show()
 
 if __name__ == "__main__":
     if hasattr(Qt, 'AA_EnableHighDpiScaling'):
