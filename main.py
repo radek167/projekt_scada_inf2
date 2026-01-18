@@ -23,18 +23,22 @@ class Scada:
         self.draw_content(painter)
         painter.restore()
 
+
 class Rura:
     def __init__(self, x1, y1, x2, y2, color, thickness, label=""):
         self.x1 = int(x1)
         self.y1 = int(y1)
         self.x2 = int(x2)
         self.y2 = int(y2)
-        self.color = color
+        self.base_color = color 
         self.thickness = thickness
         self.label = label
+        self.active = False
 
     def draw(self, painter):
-        painter.setPen(QPen(self.color, self.thickness, Qt.SolidLine, Qt.RoundCap))
+        current_color = self.base_color if self.active else QColor(50, 50, 50)
+
+        painter.setPen(QPen(current_color, self.thickness, Qt.SolidLine, Qt.RoundCap))
         painter.setBrush(Qt.NoBrush)
         painter.drawLine(self.x1, self.y1, self.x2, self.y2)
 
@@ -48,7 +52,8 @@ class Rura:
             painter.setPen(Qt.NoPen)
             painter.setBrush(QColor(0, 0, 0))
             painter.drawRect(mid_x, mid_y - 12, tw + 4, 14)
-            painter.setPen(self.color)
+
+            painter.setPen(current_color)
             painter.drawText(mid_x + 2, mid_y, self.label)
 
 class ZbiornikWoda(Scada):
@@ -124,52 +129,88 @@ class Boiler(Scada):
         Scada.__init__(self, x, y, 140, 180, name)
         self.temp = 20.0
         self.pressure = 0.0
-        self.steam_flow = 0.0
         self.water_level = 50.0
+        self.flow_dump = 0.0
 
     def draw_content(self, painter):
         painter.setPen(QPen(Qt.white, 2))
         painter.setBrush(QColor(50, 50, 50))
         painter.drawRect(0, 0, int(self.width), int(self.height))
-
         fx, fy = 30, 120
         fw, fh = 80, 40
         painter.setBrush(Qt.black)
         painter.setPen(Qt.NoPen)
         painter.drawRect(fx, fy, fw, fh)
 
-        flame_x, flame_y = fx + 20, fy - 5
-        flame_w, flame_h = 40, 45
-        painter.setRenderHint(QPainter.Antialiasing, True)
-
-        path_o = QPainterPath()
-        path_o.moveTo(flame_x + flame_w * 0.5, flame_y + flame_h)
-        path_o.cubicTo(flame_x - flame_w * 0.2, flame_y + flame_h * 0.6,
-                       flame_x + flame_w * 0.1, flame_y + flame_h * 0.1,
-                       flame_x + flame_w * 0.5, flame_y)
-        path_o.cubicTo(flame_x + flame_w * 0.9, flame_y + flame_h * 0.1,
-                       flame_x + flame_w * 1.2, flame_y + flame_h * 0.6,
-                       flame_x + flame_w * 0.5, flame_y + flame_h)
-        painter.setBrush(QColor(242, 92, 25))
-        painter.drawPath(path_o)
-
-        sub_x = flame_x + flame_w * 0.15
-        sub_y = flame_y + flame_h * 0.3
-        sub_w, sub_h = flame_w * 0.7, flame_h * 0.7
-        path_y = QPainterPath()
-        path_y.moveTo(sub_x + sub_w * 0.5, sub_y + sub_h)
-        path_y.cubicTo(sub_x - sub_w * 0.1, sub_y + sub_h * 0.6,
-                       sub_x + sub_w * 0.3, sub_y + sub_h * 0.1,
-                       sub_x + sub_w * 0.6, sub_y)
-        path_y.cubicTo(sub_x + sub_w * 1.0, sub_y + sub_h * 0.3,
-                       sub_x + sub_w * 0.8, sub_y + sub_h * 0.8,
-                       sub_x + sub_w * 0.5, sub_y + sub_h)
-        painter.setBrush(QColor(247, 237, 50))
-        painter.drawPath(path_y)
+        if self.temp > 50:
+            flame_x, flame_y = fx + 20, fy - 5
+            flame_w, flame_h = 40, 45
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            path_o = QPainterPath()
+            path_o.moveTo(flame_x + flame_w * 0.5, flame_y + flame_h)
+            path_o.cubicTo(flame_x - flame_w * 0.2, flame_y + flame_h * 0.6, flame_x + flame_w * 0.1,
+                           flame_y + flame_h * 0.1, flame_x + flame_w * 0.5, flame_y)
+            path_o.cubicTo(flame_x + flame_w * 0.9, flame_y + flame_h * 0.1, flame_x + flame_w * 1.2,
+                           flame_y + flame_h * 0.6, flame_x + flame_w * 0.5, flame_y + flame_h)
+            painter.setBrush(QColor(242, 92, 25))
+            painter.drawPath(path_o)
 
         painter.setPen(Qt.white)
         painter.setFont(QFont("Arial", 12, QFont.Bold))
         painter.drawText(40, 30, self.name)
+
+
+class ZbiornikWodaCiepla(Scada):
+    def __init__(self, x, y, name):
+        Scada.__init__(self, x, y, 100, 100, name)
+        self.level = 0.0
+        self.max_capacity = 1000.0
+        self.flow_city = 0.0
+
+    def draw_content(self, painter):
+        painter.setPen(QPen(QColor(255, 100, 100), 2))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRect(0, 0, int(self.width), int(self.height))
+        fill_h = (self.level / 100.0) * self.height
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(200, 40, 40))
+        painter.drawRect(QRectF(2, self.height - fill_h, self.width - 4, fill_h))
+        painter.setPen(Qt.white)
+        painter.setFont(QFont("Arial", 9, QFont.Bold))
+        painter.drawText(10, 20, "BUFOR")
+        painter.drawText(10, 40, "CIEPŁA")
+        painter.setPen(Qt.yellow)
+        painter.drawText(30, 80, f"{int(self.level)}%")
+
+
+class Bateria(Scada):
+    def __init__(self, x, y, name):
+        Scada.__init__(self, x, y, 100, 140, name)
+        self.charge = 50.0
+        self.current_flow = 0.0
+
+    def update(self, dt):
+        pass
+
+    def draw_content(self, painter):
+        painter.setPen(QPen(Qt.white, 2))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRect(0, 0, int(self.width), int(self.height))
+        margin_x = 10
+        active_height = self.height - 40
+        fill_h = (self.charge / 100.0) * active_height
+        color = QColor(0, 255, 0)
+        if self.charge < 20: color = QColor(255, 0, 0)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(color)
+        painter.drawRect(QRectF(margin_x, self.height - 30 - fill_h, self.width - 2 * margin_x, fill_h))
+        painter.setPen(Qt.white)
+        painter.setFont(QFont("Arial", 9, QFont.Bold))
+        painter.drawText(5, -10, self.name)
+        painter.setBrush(Qt.black)
+        painter.setPen(Qt.white)
+        painter.drawRect(20, int(self.height) - 25, 60, 20)
+        painter.drawText(30, int(self.height) - 10, f"{int(self.charge)}%")
 
 class Turbina(Scada):
     def __init__(self, x, y, name):
@@ -315,12 +356,14 @@ class SiecEnerg(Scada):
 
         painter.drawPath(path)
 
+
 class ScadaScene(QWidget):
     def __init__(self):
         super().__init__()
         self.Scadas = []
         self.Ruras = []
 
+        # --- OBIEKTY ---
         self.w1 = ZbiornikWoda(50, 50, "WODA 1\nZIMNA")
         self.w2 = ZbiornikWoda(160, 50, "WODA 2\nZIMNA")
         self.wr = ZbiornikWoda(270, 50, "WODA\nREZERWA")
@@ -328,43 +371,86 @@ class ScadaScene(QWidget):
         self.boiler = Boiler(350, 400, "KOCIOŁ")
         self.Turbina = Turbina(340, 180, "TURBINA")
         self.hot_res = ZbiornikWodaCiepla(550, 450, "Gorąca")
-        self.bat1 = Bateria(750, 400, "AKUMULATOR 1")
-        self.bat2 = Bateria(870, 400, "AKUMULATOR 2")
-
+        self.bat1 = Bateria(750, 400, "AKU 1")
+        self.bat2 = Bateria(870, 400, "AKU 2")
         self.lines = SiecEnerg(850, 20)
 
         self.Scadas.extend([self.w1, self.w2, self.wr, self.silo, self.boiler, self.Turbina,
-                                self.hot_res, self.bat1, self.bat2, self.lines])
+                            self.hot_res, self.bat1, self.bat2, self.lines])
 
-        self.Ruras.append(Rura(95, 170, 95, 220, QColor(0, 150, 255), 4))
-        self.Ruras.append(Rura(205, 170, 205, 220, QColor(0, 150, 255), 4))
-        self.Ruras.append(Rura(315, 170, 315, 450, QColor(0, 150, 255), 4))
-        self.Ruras.append(Rura(95, 220, 315, 220, QColor(0, 150, 255), 4))
-        self.Ruras.append(Rura(315, 450, 350, 450, QColor(0, 150, 255), 4))
-        self.Ruras.append(Rura(100, 550, 350, 550, QColor(150, 150, 150), 8, "PODAJNIK"))
-        self.Ruras.append(Rura(420, 400, 420, 280, Qt.white, 4, "PARA"))
-        self.Ruras.append(Rura(500, 230, 700, 230, Qt.yellow, 3))
-        self.Ruras.append(Rura(700, 230, 700, 350, Qt.yellow, 3))
-        self.Ruras.append(Rura(700, 350, 920, 350, Qt.yellow, 3))
-        self.Ruras.append(Rura(920, 350, 920, 400, Qt.yellow, 3))
-        self.Ruras.append(Rura(800, 350, 800, 400, Qt.yellow, 3))
-        self.Ruras.append(Rura(700,230,920,230,Qt.yellow, 3, "SIEĆ"))
-        self.Ruras.append(Rura(920, 230, 920, 180, Qt.yellow, 3))
-        self.Ruras.append(Rura(490, 480, 550, 480, QColor(255, 100, 100), 4))
-        self.Ruras.append(Rura(600, 450, 600, 400, QColor(255, 100, 100), 4))
-        self.Ruras.append(Rura(600, 400, 670, 400, QColor(255, 100, 100), 4, "MIASTO"))
+        self.r_w1_drop = Rura(95, 170, 95, 220, QColor(0, 150, 255), 4)
+        self.r_w2_drop = Rura(205, 170, 205, 220, QColor(0, 150, 255), 4)
+        self.r_wr_drop = Rura(315, 170, 315, 220, QColor(0, 150, 255), 4)
+
+        self.r_mix_1 = Rura(95, 220, 205, 220, QColor(0, 150, 255), 4)
+        self.r_mix_2 = Rura(205, 220, 315, 220, QColor(0, 150, 255), 4)
+
+        self.r_feed_v = Rura(315, 220, 315, 450, QColor(0, 150, 255), 4)
+        self.r_feed_h = Rura(315, 450, 350, 450, QColor(0, 150, 255), 4)
+
+        self.r_coal = Rura(100, 550, 350, 550, QColor(150, 150, 150), 8, "PODAJNIK")
+        self.r_steam = Rura(420, 400, 420, 280, Qt.white, 4, "PARA")
+
+        self.r_el_gen = Rura(500, 230, 700, 230, Qt.yellow, 3)
+
+        self.r_el_bus = Rura(700, 230, 700, 350, Qt.yellow, 3)
+        self.r_el_bat_bus = Rura(700, 350, 920, 350, Qt.yellow, 3)
+        self.r_el_b1 = Rura(800, 350, 800, 400, Qt.yellow, 3)
+        self.r_el_b2 = Rura(920, 350, 920, 400, Qt.yellow, 3)
+        self.r_el_grid_1 = Rura(700, 230, 920, 230, Qt.yellow, 3, "SIEĆ")
+        self.r_el_grid_2 = Rura(920, 230, 920, 180, Qt.yellow, 3)
+        self.r_heat_in = Rura(490, 480, 550, 480, QColor(255, 100, 100), 4)
+        self.r_heat_out = Rura(600, 450, 600, 400, QColor(255, 100, 100), 4)
+        self.r_city = Rura(600, 400, 670, 400, QColor(255, 100, 100), 4, "MIASTO")
+        self.Ruras.extend([
+            self.r_w1_drop, self.r_w2_drop, self.r_wr_drop,
+            self.r_mix_1, self.r_mix_2, self.r_feed_v, self.r_feed_h,
+            self.r_coal, self.r_steam,
+            self.r_el_gen, self.r_el_bus, self.r_el_bat_bus, self.r_el_b1, self.r_el_b2,
+            self.r_el_grid_1, self.r_el_grid_2,
+            self.r_heat_in, self.r_heat_out, self.r_city
+        ])
 
     def update_simulation(self):
         dt = 0.05
         for comp in self.Scadas:
             comp.update(dt)
+        w1_flow = (self.w1.level > 0 and self.w1.flow_out > 0)
+        w2_flow = (self.w2.level > 0 and self.w2.flow_out > 0)
+        wr_flow = (self.wr.level > 0 and self.wr.flow_out > 0)
+
+        self.r_w1_drop.active = w1_flow
+        self.r_w2_drop.active = w2_flow
+        self.r_wr_drop.active = wr_flow
+        self.r_mix_1.active = w1_flow
+        self.r_mix_2.active = (w1_flow or w2_flow)
+        main_feed_active = (self.r_mix_2.active or wr_flow)
+        self.r_feed_v.active = main_feed_active
+        self.r_feed_h.active = main_feed_active
+        self.r_steam.active = (self.boiler.pressure > 2.0)
+        self.r_coal.active = (self.silo.amount > 0)
+        gen_active = (self.Turbina.power_mw > 0.1)
+        self.r_el_gen.active = gen_active
+        bat1_has_juice = (self.bat1.charge > 1.0)
+        bat2_has_juice = (self.bat2.charge > 1.0)
+        bus_active = gen_active or bat1_has_juice or bat2_has_juice
+        self.r_el_bus.active = bus_active
+        self.r_el_bat_bus.active = bus_active
+        self.r_el_b1.active = (bat1_has_juice or bus_active)
+        self.r_el_b2.active = (bat2_has_juice or bus_active)
+        self.r_el_grid_1.active = bus_active
+        self.r_el_grid_2.active = bus_active
+        self.r_heat_in.active = (self.boiler.temp > 100.0)
+        city_active = (self.hot_res.level > 0)
+        self.r_heat_out.active = city_active
+        self.r_city.active = city_active
+
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.fillRect(self.rect(), Qt.black)
-
         for conn in self.Ruras:
             conn.draw(painter)
         for comp in self.Scadas:
