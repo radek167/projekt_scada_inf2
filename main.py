@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QLabel, QHBoxLayout, QSlider, QFrame, QCheckBox, QProgressBar
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QLabel, QHBoxLayout, QSlider, QFrame, QCheckBox, QProgressBar, QComboBox, QButtonGroup
 from PyQt5.QtCore import QTimer, Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QColor, QPen, QPolygonF, QFont, QPainterPath
 
@@ -223,7 +223,7 @@ class Bateria(Scada):
         self.charge = 50.0
 
     def update(self, dt):
-        if self.charge < 100: self.charge += 5.0 * dt
+        pass
 
     def draw_content(self, painter):
         painter.setPen(QPen(Qt.white, 2))
@@ -234,14 +234,21 @@ class Bateria(Scada):
         active_height = self.height - 40
         fill_h = (self.charge / 100.0) * active_height
 
+        color = QColor(0, 255, 0)
+        if self.charge < 20: color = QColor(255, 0, 0)
+
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(0, 255, 0) if self.charge > 20 else QColor(255, 0, 0))
+        painter.setBrush(color)
         painter.drawRect(QRectF(margin_x, self.height - 30 - fill_h, self.width - 2 * margin_x, fill_h))
 
         painter.setPen(Qt.white)
-        painter.setFont(QFont("Arial", 9))
+        painter.setFont(QFont("Arial", 9, QFont.Bold))
         painter.drawText(5, -10, self.name)
-        painter.drawText(30, int(self.height) - 5, f"{int(self.charge)}%")
+
+        painter.setBrush(Qt.black)
+        painter.setPen(Qt.white)
+        painter.drawRect(20, int(self.height) - 25, 60, 20)
+        painter.drawText(30, int(self.height) - 10, f"{int(self.charge)}%")
 
 
 class SiecEnerg(Scada):
@@ -293,7 +300,6 @@ class SiecEnerg(Scada):
         pt_ld = draw_arm(cx - hw, mid_y + 5, True)
         pt_rd = draw_arm(cx + hw, mid_y + 5, False)
 
-        # Rysowanie przewodów
         painter.setPen(QPen(QColor(255, 220, 50), 2))
         painter.setBrush(Qt.NoBrush)
 
@@ -572,7 +578,6 @@ class okno_materialy(QWidget):
                         f"Bilans: {str_bilans}"
                     )
 
-
 class okno_generacja(QWidget):
     def __init__(self, scene):
         super().__init__()
@@ -827,6 +832,274 @@ class okno_generacja(QWidget):
         vol = (self.scene.hot_res.level / 100.0) * cap
         self.lbl_city_flow.setText(f"Stan: {int(vol)} m³ / {int(cap)} m³")
 
+class okno_energia(QWidget):
+    def __init__(self, scene):
+        super().__init__()
+        self.scene = scene
+        self.setWindowTitle("ROZDZIELNIA GPZ - STEROWANIE MOCĄ")
+        self.resize(1000, 600)
+
+        self.setStyleSheet("""
+            QWidget { background-color: #151515; color: #eeeeee; font-family: Arial; font-weight: bold; }
+
+            QFrame#MainFrame { 
+                background-color: #202020; 
+                border: 3px solid #555; 
+                border-radius: 6px; 
+            }
+            QFrame#SubPanel { 
+                background-color: #101010; 
+                border: 1px solid #333; 
+                border-radius: 2px;
+            }
+
+            QLabel { border: none; font-size: 12px; background: transparent; }
+
+            QPushButton {
+                background-color: #333;
+                color: #aaa;
+                border: 2px outset #555;
+                border-radius: 4px;
+                font-size: 13px;
+                min-width: 160px;
+                max-width: 160px;
+                min-height: 70px;
+                max-height: 70px;
+                margin: 5px;
+            }
+            QPushButton:hover { background-color: #444; border: 2px solid #777; }
+            QPushButton:checked { background-color: #008800; color: white; border: 3px inset #004400; }
+            QPushButton#btn_stop:checked { background-color: #aa0000; border: 3px inset #550000; }
+
+            QCheckBox {
+                spacing: 10px;
+                font-size: 14px;
+                color: #888;
+                padding: 5px;
+                border: 1px solid #444;
+                background-color: #222;
+            }
+            QCheckBox::indicator { width: 20px; height: 20px; }
+
+            QCheckBox::indicator:unchecked {
+                background-color: #550000;
+                border: 2px solid #aa0000;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #00ff00;
+                border: 2px solid #fff;
+            }
+            QCheckBox:checked { color: white; border: 1px solid #00ff00; }
+        """)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(15)
+
+        self.frame_top = QFrame()
+        self.frame_top.setObjectName("MainFrame")
+        top_layout = QHBoxLayout(self.frame_top)
+
+        fr_gen = QFrame()
+        fr_gen.setObjectName("SubPanel")
+        l_gen = QVBoxLayout(fr_gen)
+        l_gen.addWidget(QLabel("WEJŚCIE (TURBINA)"))
+        l_gen.addWidget(MiniPodglad(self.scene.Turbina))
+        self.lbl_gen = QLabel("0 MW")
+        self.lbl_gen.setStyleSheet("color: yellow; font-size: 20px;")
+        self.lbl_gen.setAlignment(Qt.AlignCenter)
+        l_gen.addWidget(self.lbl_gen)
+        top_layout.addWidget(fr_gen)
+
+        self.arrow_1 = QLabel(">>>")
+        self.arrow_1.setStyleSheet("font-size: 30px; color: gray;")
+        self.arrow_1.setAlignment(Qt.AlignCenter)
+        top_layout.addWidget(self.arrow_1)
+
+        fr_bat = QFrame()
+        fr_bat.setObjectName("SubPanel")
+        l_bat = QVBoxLayout(fr_bat)
+        l_bat.addWidget(QLabel("BANK AKUMULATORÓW"))
+
+        hbox_akusy = QHBoxLayout()
+
+        v_aku1 = QVBoxLayout()
+        self.chk_a = QCheckBox("SEKCJA A")
+        self.chk_a.setChecked(True)
+        v_aku1.addWidget(self.chk_a)
+        v_aku1.addWidget(MiniPodglad(self.scene.bat1))
+        hbox_akusy.addLayout(v_aku1)
+
+        v_aku2 = QVBoxLayout()
+        self.chk_b = QCheckBox("SEKCJA B")
+        self.chk_b.setChecked(True)
+        v_aku2.addWidget(self.chk_b)
+        v_aku2.addWidget(MiniPodglad(self.scene.bat2))
+        hbox_akusy.addLayout(v_aku2)
+
+        l_bat.addLayout(hbox_akusy)
+
+        self.lbl_bat_status = QLabel("STAN: SPOCZYNEK")
+        self.lbl_bat_status.setAlignment(Qt.AlignCenter)
+        self.lbl_bat_status.setStyleSheet("color: white; font-size: 14px;")
+        l_bat.addWidget(self.lbl_bat_status)
+        top_layout.addWidget(fr_bat)
+
+        self.arrow_2 = QLabel(">>>")
+        self.arrow_2.setStyleSheet("font-size: 30px; color: gray;")
+        self.arrow_2.setAlignment(Qt.AlignCenter)
+        top_layout.addWidget(self.arrow_2)
+
+        fr_grid = QFrame()
+        fr_grid.setObjectName("SubPanel")
+        l_grid = QVBoxLayout(fr_grid)
+        l_grid.addWidget(QLabel("WYJŚCIE (SIEĆ KSE)"))
+        l_grid.addWidget(MiniPodglad(self.scene.lines))
+        self.lbl_grid = QLabel("0 MW")
+        self.lbl_grid.setStyleSheet("color: #00ff00; font-size: 20px;")
+        self.lbl_grid.setAlignment(Qt.AlignCenter)
+        l_grid.addWidget(self.lbl_grid)
+        top_layout.addWidget(fr_grid)
+
+        main_layout.addWidget(self.frame_top, stretch=2)
+
+        self.frame_bot = QFrame()
+        self.frame_bot.setObjectName("MainFrame")
+        bot_layout = QHBoxLayout(self.frame_bot)
+
+        bot_layout.addStretch()
+
+        self.btn_group = QButtonGroup(self)
+
+        self.btn_normal = QPushButton("PRACA NA SIEĆ\n(NORMAL)")
+        self.btn_normal.setCheckable(True)
+        self.btn_normal.setChecked(True)
+        self.btn_group.addButton(self.btn_normal)
+        bot_layout.addWidget(self.btn_normal)
+
+        self.btn_charge = QPushButton("ŁADOWANIE\nMAGAZYNU")
+        self.btn_charge.setCheckable(True)
+        self.btn_group.addButton(self.btn_charge)
+        bot_layout.addWidget(self.btn_charge)
+
+        self.btn_discharge = QPushButton("WSPOMAGANIE\n(ROZŁADUNEK)")
+        self.btn_discharge.setCheckable(True)
+        self.btn_group.addButton(self.btn_discharge)
+        bot_layout.addWidget(self.btn_discharge)
+
+        bot_layout.addSpacing(40)
+
+        self.btn_off = QPushButton("ODŁĄCZNIK\nGŁÓWNY")
+        self.btn_off.setObjectName("btn_stop")
+        self.btn_off.setCheckable(True)
+        self.btn_group.addButton(self.btn_off)
+        bot_layout.addWidget(self.btn_off)
+
+        bot_layout.addStretch()
+        main_layout.addWidget(self.frame_bot, stretch=1)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_physics)
+        self.timer.start(100)
+
+    def update_physics(self):
+        dt = 0.1
+
+        mw_in = self.scene.Turbina.power_mw
+        mw_out = 0.0
+
+        active_bats = []
+        if self.chk_a.isChecked(): active_bats.append(self.scene.bat1)
+        if self.chk_b.isChecked(): active_bats.append(self.scene.bat2)
+
+        if self.btn_normal.isChecked():
+            mw_out = mw_in
+            self.arrow_1.setText(">>>")
+            self.arrow_1.setStyleSheet("color: #00ff00; font-size: 30px;")
+            self.arrow_2.setText(">>>")
+            self.arrow_2.setStyleSheet("color: #00ff00; font-size: 30px;")
+            self.lbl_bat_status.setText("SPOCZYNEK")
+            self.lbl_bat_status.setStyleSheet("color: gray;")
+
+        elif self.btn_charge.isChecked():
+            TOTAL_CHARGE_CAPACITY = 15.0
+
+            if mw_in > 0 and len(active_bats) > 0:
+                hungry = [b for b in active_bats if b.charge < 100.0]
+                used = 0.0
+
+                if hungry:
+                    p_per_bat = TOTAL_CHARGE_CAPACITY / len(hungry)
+
+                    if mw_in < TOTAL_CHARGE_CAPACITY:
+                        p_per_bat = mw_in / len(hungry)
+                        used = mw_in
+                    else:
+                        used = TOTAL_CHARGE_CAPACITY
+
+                    for b in hungry:
+                        b.charge += p_per_bat * 0.2 * dt
+                        if b.charge > 100: b.charge = 100
+
+                    self.lbl_bat_status.setText(f"ŁADOWANIE ({len(hungry)} SEKCJE)")
+                    self.lbl_bat_status.setStyleSheet("color: orange; font-weight: bold;")
+                else:
+                    self.lbl_bat_status.setText("SEKCJE PEŁNE")
+                    self.lbl_bat_status.setStyleSheet("color: green;")
+
+                mw_out = max(0.0, mw_in - used)
+            else:
+                mw_out = 0.0
+                if len(active_bats) == 0:
+                    self.lbl_bat_status.setText("BRAK SEKCJI!")
+                    self.lbl_bat_status.setStyleSheet("color: red;")
+                else:
+                    self.lbl_bat_status.setText("BRAK MOCY WEJ.")
+                    self.lbl_bat_status.setStyleSheet("color: red;")
+
+            self.arrow_1.setText(">>>")
+            self.arrow_1.setStyleSheet("color: orange; font-size: 30px;")
+            self.arrow_2.setText(">>>") if mw_out > 0 else self.arrow_2.setText("---")
+
+        elif self.btn_discharge.isChecked():
+            TOTAL_DISCHARGE_CAP = 20.0
+
+            full = [b for b in active_bats if b.charge > 0.0]
+            boost = 0.0
+
+            if full:
+                p_per_bat = TOTAL_DISCHARGE_CAP / len(full)
+                for b in full:
+                    b.charge -= p_per_bat * 0.25 * dt
+                    if b.charge < 0: b.charge = 0
+                    boost += p_per_bat
+
+                self.lbl_bat_status.setText(f"ODDAWANIE ({len(full)} SEKCJE)")
+                self.lbl_bat_status.setStyleSheet("color: cyan; font-weight: bold;")
+                self.arrow_1.setText(">>>")
+                self.arrow_1.setStyleSheet("color: #00ff00; font-size: 30px;")
+                self.arrow_2.setText(">>> >>>")
+                self.arrow_2.setStyleSheet("color: cyan; font-size: 30px;")
+            else:
+                if len(active_bats) == 0:
+                    self.lbl_bat_status.setText("BRAK SEKCJI!")
+                else:
+                    self.lbl_bat_status.setText("PUSTE!")
+                self.lbl_bat_status.setStyleSheet("color: red; font-weight: bold;")
+                self.arrow_2.setText(">>>")
+
+            mw_out = mw_in + boost
+
+        elif self.btn_off.isChecked():
+            mw_out = 0.0
+            self.arrow_1.setText("X")
+            self.arrow_1.setStyleSheet("color: red; font-size: 30px;")
+            self.arrow_2.setText("X")
+            self.arrow_2.setStyleSheet("color: red; font-size: 30px;")
+            self.lbl_bat_status.setText("ODCIĘTE")
+            self.lbl_bat_status.setStyleSheet("color: red;")
+
+        self.lbl_gen.setText(f"{mw_in:.1f} MW")
+        self.lbl_grid.setText(f"{mw_out:.1f} MW")
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -843,6 +1116,7 @@ class MainWindow(QMainWindow):
 
         self.okno_materialy = None
         self.okno_gen = None
+        self.okno_energy = None
 
         btn = QPushButton("Materiały", self)
         btn.setGeometry(50, 600, 200, 50)
@@ -852,8 +1126,12 @@ class MainWindow(QMainWindow):
         btn_gen = QPushButton("Generacja", self)
         btn_gen.setGeometry(260, 600, 200, 50)
         btn_gen.setStyleSheet("background-color: lightgray; color: black; border: 2px solid white;")
-
         btn_gen.clicked.connect(self.otworz_okno_generacji)
+
+        btn_en = QPushButton("Energia", self)
+        btn_en.setGeometry(470, 600, 200, 50)
+        btn_en.setStyleSheet("background-color: lightgray; color: black; border: 2px solid white;")
+        btn_en.clicked.connect(self.otworz_okno_energii)
 
     def otworz_okno_materialy(self):
         if self.okno_materialy is None:
@@ -864,6 +1142,11 @@ class MainWindow(QMainWindow):
         if self.okno_gen is None:
             self.okno_gen = okno_generacja(self.scene)
         self.okno_gen.show()
+
+    def otworz_okno_energii(self):
+        if self.okno_energy is None:
+            self.okno_energy = okno_energia(self.scene)
+        self.okno_energy.show()
 
 if __name__ == "__main__":
     if hasattr(Qt, 'AA_EnableHighDpiScaling'):
