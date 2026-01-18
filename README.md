@@ -1,5 +1,5 @@
-Projekt na przedmiot Informatyka 2 prezentujący system wizualizacji SCADA dla prototypowej elektrociepłowni.
-Do uruchomienia programu należy zainstalować bibliotekę PyQt5.
+Projekt na przedmiot Informatyka 2 prezentujący system wizualizacji SCADA dla prototypowej funkcjonalnej elektrociepłowni.
+Do uruchomienia projektu należy zainstalować bibliotekę PyQt5 oraz Pytest.
 
 Wykonał Radosław Leszczyński
 nr indeksu 204057
