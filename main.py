@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QLabel, QHBoxLayout, QSlider, QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QPushButton, QVBoxLayout, QLabel, QHBoxLayout, QSlider, QFrame, QCheckBox, QProgressBar
 from PyQt5.QtCore import QTimer, Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QColor, QPen, QPolygonF, QFont, QPainterPath
 
@@ -55,9 +55,9 @@ class ZbiornikWoda(Scada):
     def __init__(self, x, y, name):
         Scada.__init__(self, x, y, 90, 120, name)
         self.level = 80.0
-        self.flow_in = 0.0  # Otwarcie zaworu wlotowego
-        self.flow_out = 0.0  # Otwarcie zaworu wylotowego
-        self.ui_label_m3 = None  # Miejsce na etykietę licznika
+        self.flow_in = 0.0
+        self.flow_out = 0.0
+        self.ui_label_m3 = None
 
     def draw_content(self, painter):
         painter.setPen(QPen(Qt.white, 2))
@@ -81,11 +81,9 @@ class ZbiornikWegiel(Scada):
         self.amount = 0.0
 
     def update(self, dt):
-
         pass
 
     def draw_content(self, painter):
-
         p1 = QPointF(0, 0)
         p2 = QPointF(self.width, 0)
         p3 = QPointF(self.width / 2, self.height)
@@ -124,6 +122,10 @@ class ZbiornikWegiel(Scada):
 class Boiler(Scada):
     def __init__(self, x, y, name):
         Scada.__init__(self, x, y, 140, 180, name)
+        self.temp = 20.0
+        self.pressure = 0.0
+        self.steam_flow = 0.0
+        self.water_level = 50.0
 
     def draw_content(self, painter):
         painter.setPen(QPen(Qt.white, 2))
@@ -169,10 +171,12 @@ class Boiler(Scada):
         painter.setFont(QFont("Arial", 12, QFont.Bold))
         painter.drawText(40, 30, self.name)
 
-
 class Turbina(Scada):
     def __init__(self, x, y, name):
         Scada.__init__(self, x, y, 160, 100, name)
+
+        self.rpm = 0.0
+        self.power_mw = 0.0
 
     def draw_content(self, painter):
         painter.setPen(QPen(Qt.white, 2))
@@ -187,17 +191,30 @@ class Turbina(Scada):
 class ZbiornikWodaCiepla(Scada):
     def __init__(self, x, y, name):
         Scada.__init__(self, x, y, 100, 100, name)
+        self.level = 0.0
+        self.max_capacity = 1000.0
+
+    def update(self, dt):
+        pass
 
     def draw_content(self, painter):
         painter.setPen(QPen(QColor(255, 100, 100), 2))
-        painter.setBrush(QColor(60, 0, 0))
+        painter.setBrush(Qt.NoBrush)
         painter.drawRect(0, 0, int(self.width), int(self.height))
 
+        fill_h = (self.level / 100.0) * self.height
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(200, 40, 40))
+        painter.drawRect(QRectF(2, self.height - fill_h, self.width - 4, fill_h))
+
         painter.setPen(Qt.white)
-        painter.setFont(QFont("Arial", 9))
-        painter.drawText(10, 30, "REZERWA")
-        painter.drawText(10, 50, "GORĄCEJ")
-        painter.drawText(10, 70, "WODY")
+        painter.setFont(QFont("Arial", 9, QFont.Bold))
+        painter.drawText(10, 20, "BUFOR")
+        painter.drawText(10, 40, "CIEPŁA")
+
+        painter.setPen(Qt.yellow)
+        painter.drawText(30, 80, f"{int(self.level)}%")
 
 
 class Bateria(Scada):
@@ -228,7 +245,6 @@ class Bateria(Scada):
 
 
 class SiecEnerg(Scada):
-
     def __init__(self, x, y):
         Scada.__init__(self, x, y, 140, 220, "")
 
@@ -240,10 +256,8 @@ class SiecEnerg(Scada):
         painter.setBrush(QColor(0, 0, 0))
 
         cx = self.width / 2
-
         box_w = 36
         hw = box_w / 2
-
         top_y = 20
         mid_y = 80
         bot_y = 150
@@ -270,7 +284,6 @@ class SiecEnerg(Scada):
             p2 = QPointF(start_x + (direction * arm_len), start_y + 5)
             p3 = QPointF(start_x + (direction * arm_len), start_y + 25)
             p4 = QPointF(start_x, start_y + 30)
-
             path = QPolygonF([p1, p2, p3, p4])
             painter.drawPolygon(path)
             return p3
@@ -280,6 +293,7 @@ class SiecEnerg(Scada):
         pt_ld = draw_arm(cx - hw, mid_y + 5, True)
         pt_rd = draw_arm(cx + hw, mid_y + 5, False)
 
+        # Rysowanie przewodów
         painter.setPen(QPen(QColor(255, 220, 50), 2))
         painter.setBrush(Qt.NoBrush)
 
@@ -331,7 +345,8 @@ class ScadaScene(QWidget):
         self.Ruras.append(Rura(700,230,920,230,Qt.yellow, 3, "SIEĆ"))
         self.Ruras.append(Rura(920, 230, 920, 180, Qt.yellow, 3))
         self.Ruras.append(Rura(490, 480, 550, 480, QColor(255, 100, 100), 4))
-        self.Ruras.append(Rura(490, 430, 600, 430, QColor(255, 100, 100), 4, "MIASTO"))
+        self.Ruras.append(Rura(600, 450, 600, 400, QColor(255, 100, 100), 4))
+        self.Ruras.append(Rura(600, 400, 670, 400, QColor(255, 100, 100), 4, "MIASTO"))
 
     def update_simulation(self):
         dt = 0.05
@@ -427,7 +442,7 @@ class okno_materialy(QWidget):
         layout_wegiel.addLayout(col_wegiel)
         main_layout.addWidget(ramka_wegiel)
 
-        lbl_woda = QLabel("STEROWNIA HYDRAULICZNA (1000 m³)")
+        lbl_woda = QLabel("STEROWNIA PRZEPŁYWU WODY (1000 m³)")
         lbl_woda.setStyleSheet("font-weight: bold; color: cyan; font-size: 14px; margin-top: 10px;")
         lbl_woda.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(lbl_woda)
@@ -557,6 +572,261 @@ class okno_materialy(QWidget):
                         f"Bilans: {str_bilans}"
                     )
 
+
+class okno_generacja(QWidget):
+    def __init__(self, scene):
+        super().__init__()
+        self.scene = scene
+        self.setWindowTitle("Generacja")
+        self.resize(1000, 600)
+
+        self.setStyleSheet("""
+            QWidget { background-color: #1a1a1a; color: #eee; font-family: Arial; }
+            QLabel { font-size: 12px; }
+            QSlider::handle:horizontal { background: #ff9900; width: 20px; border-radius: 5px; }
+            QProgressBar { border: 1px solid #555; text-align: center; color: white; font-weight: bold; }
+            QProgressBar::chunk { background-color: #ff9900; }
+        """)
+
+        self.tank_val = 500.0
+
+        layout = QHBoxLayout(self)
+
+        col_boiler = QVBoxLayout()
+
+        frame_boiler = QFrame()
+        frame_boiler.setStyleSheet("background-color: #222; border: 1px solid #444;")
+        lay_fb = QVBoxLayout(frame_boiler)
+        lay_fb.addWidget(QLabel("1. KOCIOŁ PAROWY"))
+        lay_fb.addWidget(MiniPodglad(self.scene.boiler))
+        col_boiler.addWidget(frame_boiler)
+
+        self.lbl_feed = QLabel("PALENISKO (WĘGIEL): 0%")
+        self.lbl_feed.setStyleSheet("color: orange; font-weight: bold;")
+        col_boiler.addWidget(self.lbl_feed)
+        self.slider_feed = QSlider(Qt.Horizontal)
+        self.slider_feed.setRange(0, 100)
+        self.slider_feed.valueChanged.connect(self.update_labels)
+        col_boiler.addWidget(self.slider_feed)
+
+        self.bar_temp = QProgressBar()
+        self.bar_temp.setRange(0, 300)
+        self.bar_temp.setFormat("Temp: %v °C")
+        self.bar_temp.setStyleSheet("QProgressBar::chunk { background-color: #d63030; }")
+        col_boiler.addWidget(self.bar_temp)
+
+        self.bar_press = QProgressBar()
+        self.bar_press.setRange(0, 150)
+        self.bar_press.setFormat("Ciśnienie: %v bar")
+        self.bar_press.setStyleSheet("QProgressBar::chunk { background-color: #30d6d6; }")
+        col_boiler.addWidget(self.bar_press)
+
+        self.bar_boiler_water = QProgressBar()
+        self.bar_boiler_water.setRange(0, 100)
+        self.bar_boiler_water.setFormat("Woda w kotle: %v %")
+        self.bar_boiler_water.setStyleSheet("QProgressBar::chunk { background-color: #0088ff; }")
+        col_boiler.addWidget(self.bar_boiler_water)
+
+        frame_tank = QFrame()
+        frame_tank.setStyleSheet("background-color: #001122; border-radius: 5px; margin-top: 10px; padding: 5px;")
+        lay_ft = QVBoxLayout(frame_tank)
+
+        lay_ft.addWidget(QLabel("ZBIORNIK WODY ZASILAJĄCEJ"))
+
+        self.bar_tank = QProgressBar()
+        self.bar_tank.setRange(0, 1000)
+        self.bar_tank.setFormat("%v m³")
+        self.bar_tank.setStyleSheet("QProgressBar::chunk { background-color: #004488; }")
+        lay_ft.addWidget(self.bar_tank)
+
+        self.lbl_inflow_info = QLabel("Dopływ z rurociągów (W1+W2+WR): 0 m³/h")
+        self.lbl_inflow_info.setStyleSheet("color: cyan; font-size: 11px;")
+        lay_ft.addWidget(self.lbl_inflow_info)
+
+        lay_ft.addWidget(QLabel("POMPA KOTŁOWA (Tłoczenie do kotła)"))
+        self.slider_pump = QSlider(Qt.Horizontal)
+        self.slider_pump.setStyleSheet("QSlider::handle:horizontal { background: #0088ff; }")
+        lay_ft.addWidget(self.slider_pump)
+
+        col_boiler.addWidget(frame_tank)
+        col_boiler.addStretch()
+        layout.addLayout(col_boiler)
+
+        col_res = QVBoxLayout()
+        frame_res = QFrame()
+        frame_res.setStyleSheet("background-color: #222; border: 1px solid #444;")
+        lay_fr = QVBoxLayout(frame_res)
+        lay_fr.addWidget(QLabel("2. BUFOR CIEPŁA"))
+        lay_fr.addWidget(MiniPodglad(self.scene.hot_res))
+        col_res.addWidget(frame_res)
+
+        box_dump = QFrame()
+        box_dump.setStyleSheet("background-color: #331111; border-radius: 5px; padding: 5px;")
+        lay_bd = QVBoxLayout(box_dump)
+        self.lbl_valve_status = QLabel("Wymagane > 110°C")
+        self.lbl_valve_status.setStyleSheet("color: gray;")
+        lay_bd.addWidget(self.lbl_valve_status)
+        self.chk_to_reserve = QCheckBox("ZRZUT DO BUFORA")
+        self.chk_to_reserve.setEnabled(False)
+        lay_bd.addWidget(self.chk_to_reserve)
+        col_res.addWidget(box_dump)
+
+        col_res.addWidget(QLabel("ZASILANIE MIASTA"))
+        self.slider_city = QSlider(Qt.Horizontal)
+        self.slider_city.setRange(0, 100)
+        self.slider_city.setStyleSheet("QSlider::handle:horizontal { background: #ff4444; }")
+        self.slider_city.valueChanged.connect(self.update_labels)
+        col_res.addWidget(self.slider_city)
+        self.lbl_city_flow = QLabel("...")
+        self.lbl_city_flow.setAlignment(Qt.AlignCenter)
+        col_res.addWidget(self.lbl_city_flow)
+        col_res.addStretch()
+        layout.addLayout(col_res)
+
+        col_turbine = QVBoxLayout()
+        frame_turb = QFrame()
+        frame_turb.setStyleSheet("background-color: #222; border: 1px solid #444;")
+        lay_fturb = QVBoxLayout(frame_turb)
+        lay_fturb.addWidget(QLabel("3. TURBINA"))
+        lay_fturb.addWidget(MiniPodglad(self.scene.Turbina))
+        col_turbine.addWidget(frame_turb)
+
+        self.lbl_rpm = QLabel("0 RPM")
+        self.lbl_rpm.setStyleSheet("font-size: 20px; font-weight: bold; color: cyan;")
+        self.lbl_rpm.setAlignment(Qt.AlignCenter)
+        col_turbine.addWidget(self.lbl_rpm)
+        self.bar_rpm = QProgressBar()
+        self.bar_rpm.setRange(0, 3500)
+        self.bar_rpm.setTextVisible(False)
+        col_turbine.addWidget(self.bar_rpm)
+        self.lbl_mw = QLabel("0.0 MW")
+        self.lbl_mw.setStyleSheet("font-size: 28px; font-weight: bold; color: #00ff00; margin-top: 20px;")
+        self.lbl_mw.setAlignment(Qt.AlignCenter)
+        col_turbine.addWidget(self.lbl_mw)
+        col_turbine.addStretch()
+        layout.addLayout(col_turbine)
+
+        self.physics_timer = QTimer(self)
+        self.physics_timer.timeout.connect(self.update_physics)
+        self.physics_timer.start(100)
+
+    def update_labels(self):
+        self.lbl_feed.setText(f"PALENISKO (WĘGIEL): {self.slider_feed.value()}%")
+
+    def update_physics(self):
+        dt = 0.1
+
+        inflow_sum = 0.0
+
+        if self.scene.w1.level > 0: inflow_sum += self.scene.w1.flow_out
+        if self.scene.w2.level > 0: inflow_sum += self.scene.w2.flow_out
+        if self.scene.wr.level > 0: inflow_sum += self.scene.wr.flow_out
+
+        real_inflow = inflow_sum * 0.05
+
+        self.tank_val += real_inflow * dt
+
+        self.lbl_inflow_info.setText(f"Dopływ z rurociągów (W1+W2+WR): {real_inflow:.1f} m³/jedn")
+
+        pump_speed = self.slider_pump.value() * 0.2
+        actual_pump = 0.0
+
+        if self.tank_val > 0 and self.scene.boiler.water_level < 100:
+            actual_pump = pump_speed
+
+            max_possible = self.tank_val / dt
+            if actual_pump > max_possible:
+                actual_pump = max_possible
+
+            self.tank_val -= actual_pump * dt
+
+        if self.tank_val < 0: self.tank_val = 0
+        if self.tank_val > 1000: self.tank_val = 1000
+        self.bar_tank.setValue(int(self.tank_val))
+
+        self.scene.boiler.water_level += actual_pump * 0.2 * dt
+
+        steam_loss = 0.0
+        if self.scene.boiler.pressure > 0:
+            steam_loss = self.scene.boiler.pressure * 0.05
+        self.scene.boiler.water_level -= steam_loss * dt
+
+        if self.scene.boiler.water_level < 0: self.scene.boiler.water_level = 0
+        if self.scene.boiler.water_level > 100: self.scene.boiler.water_level = 100
+
+        feed = self.slider_feed.value()
+        heat_gain = 0
+        if self.scene.silo.amount > 0:
+            burn_cost = (feed / 100.0) * 0.05
+            if self.scene.silo.amount >= burn_cost:
+                self.scene.silo.amount -= burn_cost
+                heat_gain = feed * 0.3
+            else:
+                self.scene.silo.amount = 0
+
+        heat_loss = (self.scene.boiler.temp - 20.0) * 0.02
+
+        if self.scene.boiler.water_level <= 0: pass
+
+        transfer_cooling = 0.0
+        valve_open = self.chk_to_reserve.isChecked()
+        if self.scene.boiler.temp > 110.0:
+            self.chk_to_reserve.setEnabled(True)
+            self.lbl_valve_status.setText("GOTOWOŚĆ")
+            self.lbl_valve_status.setStyleSheet("color: green")
+            if valve_open:
+                if self.scene.hot_res.level < 100:
+                    transfer_cooling = 15.0
+                    self.scene.hot_res.level += 0.2
+        else:
+            if valve_open: self.chk_to_reserve.setChecked(False)
+            self.chk_to_reserve.setEnabled(False)
+            self.lbl_valve_status.setText("Zimny kocioł")
+            self.lbl_valve_status.setStyleSheet("color: gray")
+
+        self.scene.boiler.temp += (heat_gain - heat_loss - transfer_cooling) * dt
+        self.scene.boiler.temp = max(20.0, min(600.0, self.scene.boiler.temp))
+
+        target_p = 0
+        if self.scene.boiler.temp > 100 and self.scene.boiler.water_level > 0:
+            target_p = (self.scene.boiler.temp - 100) * 0.5
+
+        inertia = 0.05 if self.scene.boiler.water_level > 0 else 0.2
+        self.scene.boiler.pressure += (target_p - self.scene.boiler.pressure) * inertia
+
+        city_demand = self.slider_city.value()
+        if self.scene.hot_res.level > 0:
+            drain = (city_demand / 100.0) * 0.1
+            self.scene.hot_res.level -= drain
+        self.scene.hot_res.level = max(0.0, min(100.0, self.scene.hot_res.level))
+
+        p_in = self.scene.boiler.pressure
+        torque = 0
+        if p_in > 20: torque = (p_in - 20) * 2.0
+        friction = self.scene.Turbina.rpm * 0.05
+        load = 0
+        if self.scene.Turbina.rpm > 2500: load = (self.scene.Turbina.rpm - 2500) * 0.5
+
+        self.scene.Turbina.rpm += (torque - friction - load) * dt
+        if self.scene.Turbina.rpm < 0: self.scene.Turbina.rpm = 0
+
+        mw = 0
+        if self.scene.Turbina.rpm > 0:
+            mw = (self.scene.Turbina.rpm / 3000.0) * 50.0
+            if mw > 55: mw = 55
+        self.scene.Turbina.power_mw = mw
+
+        self.bar_temp.setValue(int(self.scene.boiler.temp))
+        self.bar_press.setValue(int(self.scene.boiler.pressure))
+        self.bar_boiler_water.setValue(int(self.scene.boiler.water_level))
+        self.lbl_rpm.setText(f"{int(self.scene.Turbina.rpm)} RPM")
+        self.bar_rpm.setValue(int(self.scene.Turbina.rpm))
+        self.lbl_mw.setText(f"{mw:.1f} MW")
+
+        cap = getattr(self.scene.hot_res, 'max_capacity', 1000.0)
+        vol = (self.scene.hot_res.level / 100.0) * cap
+        self.lbl_city_flow.setText(f"Stan: {int(vol)} m³ / {int(cap)} m³")
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -572,17 +842,28 @@ class MainWindow(QMainWindow):
         self.timer.start(50)
 
         self.okno_materialy = None
+        self.okno_gen = None
 
         btn = QPushButton("Materiały", self)
-        btn.setGeometry(50,600,200,50)
+        btn.setGeometry(50, 600, 200, 50)
         btn.setStyleSheet("background-color: lightgray; color: black; border: 2px solid white;")
-        btn.clicked.connect(self.okno_materialy1)
+        btn.clicked.connect(self.otworz_okno_materialy)
 
-    def okno_materialy1(self):
+        btn_gen = QPushButton("Generacja", self)
+        btn_gen.setGeometry(260, 600, 200, 50)
+        btn_gen.setStyleSheet("background-color: lightgray; color: black; border: 2px solid white;")
+
+        btn_gen.clicked.connect(self.otworz_okno_generacji)
+
+    def otworz_okno_materialy(self):
         if self.okno_materialy is None:
             self.okno_materialy = okno_materialy(self.scene)
-
         self.okno_materialy.show()
+
+    def otworz_okno_generacji(self):
+        if self.okno_gen is None:
+            self.okno_gen = okno_generacja(self.scene)
+        self.okno_gen.show()
 
 if __name__ == "__main__":
     if hasattr(Qt, 'AA_EnableHighDpiScaling'):
